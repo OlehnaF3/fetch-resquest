@@ -1,9 +1,33 @@
-// inject.js – выполняется на странице, имеет доступ к глобальным объектам
+// inject.js – выполняется на странице
 
 (function() {
+  // Вспомогательная функция для извлечения columns и pageSize из тела запроса
+  function parseRequest(body) {
+    if (typeof body !== 'string') return null;
+    try {
+      const parsed = JSON.parse(body);
+      return {
+        columns: parsed.columns || null,
+        pageSize: parsed.pageSize || null
+      };
+    } catch (e) {
+      return null;
+    }
+  }
+
   // ---- Перехват fetch ----
   const originalFetch = window.fetch;
   window.fetch = function(...args) {
+    const options = args[1] || {};
+    let requestInfo = null;
+
+    if (options.method === 'POST' && options.body) {
+      const parsed = parseRequest(options.body);
+      if (parsed) {
+        requestInfo = parsed;
+      }
+    }
+
     return originalFetch.apply(this, args).then(async (response) => {
       const clone = response.clone();
       let body = '';
@@ -17,9 +41,11 @@
         payload: {
           url: response.url,
           status: response.status,
-          method: args[1]?.method || 'GET',
+          method: options.method || 'GET',
           responseBody: body,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          columns: requestInfo?.columns || null,
+          pageSize: requestInfo?.pageSize || null
         }
       }, '*');
       return response;
@@ -37,6 +63,15 @@
   };
 
   XMLHttpRequest.prototype.send = function(body) {
+    let requestInfo = null;
+    if (body && typeof body === 'string') {
+      const parsed = parseRequest(body);
+      if (parsed) {
+        requestInfo = parsed;
+      }
+    }
+    this._requestInfo = requestInfo;
+
     this.addEventListener('load', function() {
       let responseBody = '';
       try {
@@ -51,7 +86,9 @@
           status: this.status,
           method: this._method,
           responseBody: responseBody,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          columns: this._requestInfo?.columns || null,
+          pageSize: this._requestInfo?.pageSize || null
         }
       }, '*');
     });

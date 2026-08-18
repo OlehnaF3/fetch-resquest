@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let html = '';
     log.forEach(entry => {
       const statusClass = (entry.status >= 200 && entry.status < 400) ? 'ok' : 'err';
-      const headers = ['ID заказа', 'Приоритет'];
+      const headers = ['№', 'ID заказа', 'Приоритет'];
 
       html += `
         <div class="log-item">
@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${(entry.shortData || []).slice(0, 20).map(row => `
                   <tr>${row.map(cell => `<td>${escapeHtml(String(cell))}</td>`).join('')}</tr>
                 `).join('')}
-                ${(entry.shortData && entry.shortData.length > 20) ? `<tr><td colspan="2" style="text-align:center;color:#999;">... и ещё ${entry.shortData.length - 20} строк</td></tr>` : ''}
+                ${(entry.shortData && entry.shortData.length > 20) ? `<tr><td colspan="3" style="text-align:center;color:#999;">... и ещё ${entry.shortData.length - 20} строк</td></tr>` : ''}
               </tbody>
             </table>
           </div>
