@@ -1,30 +1,46 @@
-
 let requestLog = [];
 
-// Сохраняем лог в storage
 function saveLog() {
   chrome.storage.local.set({ requestLog });
 }
 
-// Добавляем запись с обрезанными данными (первые 9 полей)
 function addLogEntry(entry) {
-	if (!entry.url.includes('/api/data/flexView/so.SO_H')) {
-    return; // игнорируем все остальные запросы
+  // Фильтр: только нужный эндпоинт
+  if (!entry.url.includes('/api/data/flexView/so.SO_H')) {
+    return;
   }
+
   let shortData = null;
   let resultSize = null;
-  let summary = null;
+  const columns = entry.columns || [];
+  const pageSize = entry.pageSize || null; // из запроса
 
-  // Пытаемся распарсить JSON и извлечь data
   try {
     const parsed = JSON.parse(entry.responseBody);
     if (parsed.data && Array.isArray(parsed.data)) {
-      shortData = parsed.data.map(row => [row[0], row[8]]); // только первые 9 полей
-      resultSize = parsed.resultSize || parsed.data.length;
-      summary = parsed.summaryRows || null;
+      const data = parsed.data;
+      const totalRows = data.length;
+
+      // Определяем индексы нужных полей
+      let idIndex = columns.indexOf('soh.id');
+      let pickPriorityIndex = columns.indexOf('soh.pickPriority');
+
+      // Если не нашли – используем индексы по умолчанию (0 и 8)
+      if (idIndex === -1) idIndex = 0;
+      if (pickPriorityIndex === -1) pickPriorityIndex = 8;
+
+      // Формируем строки с нумерацией: №, ID, Приоритет
+      shortData = data.map((row, index) => {
+        const rowNumber = index + 1; // всегда нумеруем по порядку
+        const id = row[idIndex] !== undefined ? row[idIndex] : '';
+        const priority = row[pickPriorityIndex] !== undefined ? row[pickPriorityIndex] : '';
+        return [rowNumber, id, priority];
+      });
+
+      resultSize = parsed.resultSize || totalRows;
     }
   } catch (e) {
-    // Не JSON – оставляем как есть
+    console.warn('Не удалось распарсить ответ:', e);
   }
 
   const logEntry = {
@@ -32,10 +48,8 @@ function addLogEntry(entry) {
     method: entry.method,
     status: entry.status,
     time: entry.timestamp || new Date().toISOString(),
-    shortData: shortData,       // обрезанные данные
+    shortData: shortData,
     resultSize: resultSize,
-    summary: summary,
-    fullBody: entry.responseBody // опционально, но можем не хранить, чтобы экономить место
   };
 
   requestLog.unshift(logEntry);
